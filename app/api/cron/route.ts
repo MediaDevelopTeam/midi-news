@@ -2,13 +2,21 @@ import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import { subscriptions } from '../subscribe/route'; // 유저 주소록 (실무에선 DB)
 
-webpush.setVapidDetails(
-  'mailto:your-email@example.com',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+
+  try {
+    webpush.setVapidDetails(
+      'mailto:your-email@example.com',
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!
+    );
+  } catch (initError) {
+    console.error('VAPID 키 초기화 실패:', initError);
+    return NextResponse.json({ error: '서버 키 설정 에러' }, { status: 500 });
+  }
+
   // 1. 현재 한국 시간 기준 월/일 계산
   const now = new Date();
   const kstOffset = 9 * 60 * 60 * 1000;
