@@ -1,65 +1,48 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  const subscribeUser = async () => {
+    if ('serviceWorker' in navigator) {
+      try {
+        // 1. 서비스 워커 등록 확인
+        const register = await navigator.serviceWorker.register('/sw.js');
+        
+        // 2. 알림 권한 요청 및 구독 생성
+        const subscription = await register.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+        });
+
+        // 3. 구독 정보(토큰)를 Next.js 백엔드로 전송하여 DB 대신 메모리/파일에 보관 요청
+        await fetch('/api/subscribe', {
+          method: 'POST',
+          body: JSON.stringify(subscription),
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        setIsSubscribed(true);
+        alert('알림 구독 성공! 이제 10시 45분 배너 알림을 기다리세요. (창을 닫으셔도 됩니다)');
+      } catch (error) {
+        console.error('구독 실패:', error);
+      }
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
+      <h1>⏰ Next.js 정각/지정 시각 알림 서비스</h1>
+      <p>아래 버튼을 눌러 내 브라우저를 등록하면 창을 닫아도 알림이 옵니다.</p>
+      <button 
+        onClick={subscribeUser} 
+        disabled={isSubscribed}
+        style={{ padding: '15px 30px', fontSize: '16px', background: isSubscribed ? '#6c757d' : '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+      >
+        {isSubscribed ? '🔔 알림 구독 완료됨' : '🔔 10시 45분 알림 구독하기'}
+      </button>
     </div>
   );
 }
