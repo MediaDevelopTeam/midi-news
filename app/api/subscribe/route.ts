@@ -1,15 +1,30 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// 실무에서는 데이터베이스(DB)에 저장해야 하지만, 테스트를 위해 전역 변수(배열)에 임시 보관합니다.
-export const subscriptions: any[] = [];
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: Request) {
   const subscription = await request.json();
-  
-  // 중복 체크 후 주소록에 추가
-  if (!subscriptions.some(sub => sub.endpoint === subscription.endpoint)) {
-    subscriptions.push(subscription);
+
+  // 브라우저 구독 정보에서 핵심 키값들을 추출합니다.
+  const { endpoint, keys } = subscription;
+  const { auth, p256dh } = keys;
+
+  // DB에 중복 저장되지 않도록 먼저 확인 후 삽입(Upsert)합니다.
+  const { error } = await supabase
+    .from('subscriptions')
+    .upsert(
+      { endpoint, auth, p256dh },
+      { onConflict: 'endpoint' }
+    );
+
+  if (error) {
+    console.error('DB 저장 에러:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  
+
   return NextResponse.json({ success: true });
 }

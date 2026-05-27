@@ -1,50 +1,60 @@
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
-import { subscriptions } from '../subscribe/route'; // 유저 주소록 (실무에선 DB)
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
+export async function GET(request: Request) {
   try {
     webpush.setVapidDetails(
       'mailto:your-email@example.com',
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
       process.env.VAPID_PRIVATE_KEY!
     );
-  } catch (initError) {
-    console.error('VAPID 키 초기화 실패:', initError);
-    return NextResponse.json({ error: '서버 키 설정 에러' }, { status: 500 });
+
+    // 1. Supabase DB에서 모든 구독자 정보 가져오기
+    const { data: dbSubs, error } = await supabase.from('subscriptions').select('*');
+    
+    if (error || !dbSubs) {
+      throw new Error(error?.message || '구독자 목록을 가져올 수 없습니다.');
+    }
+
+    console.log(`[크론] DB에서 조회된 구독자 수: ${dbSubs.length}명`);
+
+    // 2. web-push 라이브러리가 읽을 수 있는 형태로 규격 포맷팅
+    const formattedSubs = dbSubs.map(sub => ({
+      endpoint: sub.endpoint,
+      keys: {
+        auth: sub.auth,
+        p256dh: sub.p256dh
+      }
+    }));
+
+    // 3. 푸시 알림 내용 생성
+    const payload = JSON.stringify({
+      title: '🎂 드디어 성공한 푸시 알림! 🎉',
+      body: '서버가 꺼졌다가 깨어나도 DB 덕분에 주소를 기억하고 알림을 보냈습니다! 🚀',
+    });
+
+    // 4. 전체 발송
+    const pushPromises = formattedSubs.map((sub) =>
+      webpush.sendNotification(sub, payload).catch((err) => console.error('발송 에러:', err))
+    );
+
+    await Promise.all(pushPromises);
+
+    return NextResponse.json({ 
+      message: 'DB 기반 알림 발송 완료', 
+      sentCount: formattedSubs.length 
+    });
+
+  } catch (err) {
+    console.error('크론 작업 중 치명적 에러:', err);
+    return NextResponse.json({ error: '알림 발송 실패' }, { status: 500 });
   }
-
-  // 1. 현재 한국 시간 기준 월/일 계산
-  const now = new Date();
-  const kstOffset = 9 * 60 * 60 * 1000;
-  const kstDate = new Date(now.getTime() + kstOffset);
-  
-  const currentMonth = kstDate.getUTCMonth() + 1;
-  const currentDate = kstDate.getUTCDate();
-  const hours = kstDate.getUTCHours();
-  const minutes = kstDate.getUTCMinutes();
-
-  console.log(`[생일 크론 실행] 현재 시각: ${hours}시 ${minutes}분 (${currentMonth}월 ${currentDate}일)`);
-
-  // 알림 내용 수정
-  const payload = JSON.stringify({
-    title: '⏰ 11시 10분 알림 테스트! 🎉',
-    body: `현재 시간 ${hours}시 ${minutes}분입니다. 생일 알림 크론이 정상 작동했습니다!`,
-  });
-
-  // 3. 오늘 생일인 사람들에게 푸시 발송
-  // (여기서는 테스트를 위해 등록된 모든 구독자에게 발송하되, 실제로는 생일자 필터링 로직이 들어갑니다)
-  const pushPromises = subscriptions.map((sub) =>
-    webpush.sendNotification(sub, payload).catch((err) => console.error('발송 에러:', err))
-  );
-
-  await Promise.all(pushPromises);
-
-  return NextResponse.json({ 
-    message: `${currentMonth}월 ${currentDate}일 생일 알림 발송 완료`, 
-    sentCount: subscriptions.length 
-  });
 }
