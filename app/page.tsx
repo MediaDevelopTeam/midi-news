@@ -13,13 +13,15 @@ export default function Home() {
 
     try {
       // 1단계: 서비스 워커 등록
-      const register = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.register('/sw.js');
+
+      const readyRegister = await navigator.serviceWorker.ready;
       
       // 2단계: 구독 생성
-      const subscription = await register.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      });
+      const subscription = await readyRegister.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    });
 
       alert('1단계 완료: 브라우저 알림 토큰 생성 성공! 이제 서버로 전송합니다.');
 
@@ -46,7 +48,7 @@ export default function Home() {
 
   return (
     <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
-      <h1>⏰ Next.js 11시 10분 알림 서비스</h1>
+      <h1>⏰ Next.js 11시 20분 알림 서비스</h1>
       <p>아래 버튼을 눌러 테스트를 진행해 주세요.</p>
       <button 
         onClick={subscribeUser} 
